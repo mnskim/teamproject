@@ -99,8 +99,8 @@ class Trainer(object):
         nums = self.reset_losses()
 
         # Initialize progress bar
-        bar = utils.initialize_progress_bar(
-            self.data_loader.sequences["train"])
+        #bar = utils.initialize_progress_bar(
+        #    self.data_loader.sequences["train"])
 
         reset = False
 
@@ -109,7 +109,7 @@ class Trainer(object):
             self.do_backward_pass(loss)
             self.update_parameters()
 
-            bar.update(self.opt.train.dynamic.bs)
+            #bar.update(self.opt.train.dynamic.bs)
             self.count += 1
 
             for loss_name in self.losses["train"]:
@@ -186,7 +186,8 @@ class IteratorTrainer(Trainer):
         self.set_logger()
 
         # Initialize progress bar
-        bar = utils.set_progress_bar(self.total_iters)
+        #bar = utils.set_progress_bar(self.total_iters)
+        bar = None
 
         for cycle_num in range(int(self.total_iters / self.iters)):
             self.model.train()
@@ -223,7 +224,7 @@ class IteratorTrainer(Trainer):
                     loss.item() / self.opt.train.dynamic.bs,
                     self.opt.train.dynamic.epoch)
 
-            bar.update(1)
+            #bar.update(1)
 
             if cfg.toy and i > 10:
                 break
