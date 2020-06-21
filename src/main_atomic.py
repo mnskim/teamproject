@@ -26,7 +26,7 @@ def main(num, pickled_data=None):
     # Read config file to option
     config = cfg.read_config(cfg.load_config(config_file))
     opt, meta = cfg.get_parameters(config)
-    ipdb.set_trace()
+    #ipdb.set_trace()
 
     # Set the random seeds
     torch.manual_seed(opt.train.static.seed)
