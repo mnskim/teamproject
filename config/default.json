@@ -14,7 +14,7 @@
 
     "random_seed": 123,
     "optimizer": "adam",
-    "batch_size": 4,
+    "batch_size": 16,
     "learning_rate": 6.25e-5,
 
     "clip": 1,
@@ -41,7 +41,7 @@
 
     "trainer": "iteration",
 
-    "iterations": 50000,
+    "iterations": 2000,
     "cycle": 500,
 
     "save_strategy": "best",
