@@ -110,7 +110,8 @@ class GenerationDataLoader(DataLoader):
             elif split == 'test':
                 n_data = self.n_test
 
-            G=nx.Graph()
+            #G=nx.Graph()
+            G=nx.DiGraph()
             entities = set()
 
             file_name = "v4_atomic_{}.csv".format(map_name(split))
@@ -119,7 +120,7 @@ class GenerationDataLoader(DataLoader):
             df.iloc[:, :9] = df.iloc[:, :9].apply(
                 lambda col: col.apply(json.loads))
             
-            for cat in self.categories:
+            for cat in [item for item in self.categories if not 'Inverse' in item]:
                 attr = df[cat]
                 triples = utils.zipped_flatten(zip(attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
@@ -130,9 +131,10 @@ class GenerationDataLoader(DataLoader):
                     entities.add(m2)
                     G.add_node(m1)
                     G.add_node(m2)
-                    G.add_edge(m1, m2, rel=rel)       
+                    G.add_edge(m1, m2, rel=rel) 
+                    G.add_edge(m2, m1, rel=rel.replace('>','Inverse>'))# Inverse relation
 
-                #ipdb.set_trace()
+                    #ipdb.set_trace()
                 #self.data[split]["total"] += utils.zipped_flatten(zip(
                 #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
@@ -148,7 +150,10 @@ class GenerationDataLoader(DataLoader):
 
                     n_attempts = 0
                     while len(walk.walk) * 2 < self.max_path_len:
-                        obj, relation = data_utils.single_step(curr_node, G)
+                        obj, relation, dead_end = data_utils.single_step(curr_node, G)
+                        if dead_end:
+                            n_attempts += 1
+                            break
                         updated = walk.update(obj, relation)
                         if updated:
                             curr_node = obj
@@ -163,10 +168,13 @@ class GenerationDataLoader(DataLoader):
                     if not ' '.join(walk.walk) in unique_paths:
                         examples.append(walk.walk)
                         unique_paths.add(' '.join(walk.walk))
+                        #print(' '.join(walk.walk))
 
                     if len(examples) % 500 == 0:
                         print("\nGenerated {} {} examples".format(len(examples), split))
                         print(walk.walk)
+
+                #ipdb.set_trace()
 
                 if len(examples) >= n_data:
                     break
@@ -201,7 +209,7 @@ class GenerationDataLoader(DataLoader):
                 self.data[split]["total"] += utils.zipped_flatten(zip(
                     attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
-        ipdb.set_trace()
+        #ipdb.set_trace()
         if do_take_partial_dataset(self.opt.data):
             self.data["train"]["total"] = select_partial_dataset(
                 self.opt.data, self.data["train"]["total"])
@@ -275,6 +283,9 @@ class GenerationDataLoader(DataLoader):
                     self.sequences[split]["total"].device))
         else:
             seqs = self.sequences[split]["total"][offset:offset + bs]
+
+        #if split == 'dev':            
+            #ipdb.set_trace()
         batch["sequences"] = seqs.to(cfg.device)
         batch["attention_mask"] = make_attention_mask(seqs)
         batch["loss_mask"] = make_loss_mask(
@@ -424,14 +435,15 @@ def do_example(text_encoder, walk_path):
 
     for idx, item in enumerate(walk_path):
         final = None
-        if idx % 2  == 0: # Odd -> rel
+        if idx % 2  == 0: # Odd -> node
             if "___" in item:
                 final = handle_underscores(item, text_encoder, True)
             elif "_" in item:
                 final = handle_underscores(item, text_encoder, False)
             else:
                 final = text_encoder.encode([item], verbose=False)[0]
-        else: # Even -> node
+        else: # Even -> rel
+            #ipdb.set_trace()
             final = [text_encoder.encoder[item]]
 
         final_sequence.append(final)

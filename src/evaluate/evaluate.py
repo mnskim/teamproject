@@ -1,3 +1,4 @@
+import ipdb
 import time
 import torch
 
@@ -22,7 +23,7 @@ class Evaluator(object):
     def validate(self, l, split="dev", losses={}, keyset=None):
         self.batch_variables["split"] = split
         print("Evaluating {}".format(split))
-
+        #ipdb.set_trace()
         epoch_losses = self.epoch(
             self.opt, self.model, self.data_loader, split, keyset)
 

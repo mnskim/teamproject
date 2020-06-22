@@ -1,7 +1,7 @@
 {
     
     "dataset": "atomic",
-    "categories": ["oReact", "oEffect", "oWant", "xAttr", "xEffect", "xIntent", "xNeed", "xReact", "xWant"],
+    "categories": ["oReact", "oEffect", "oWant", "xAttr", "xEffect", "xIntent", "xNeed", "xReact", "xWant", "oReactInverse", "oEffectInverse", "oWantInverse", "xAttrInverse", "xEffectInverse", "xIntentInverse", "xNeedInverse", "xReactInverse", "xWantInverse"],
     "eval_categories": ["oReact", "oEffect", "oWant", "xAttr", "xEffect", "xIntent", "xNeed", "xReact", "xWant"],
     "exp": "generation",
     "labels": "individual",

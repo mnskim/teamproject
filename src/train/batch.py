@@ -105,6 +105,9 @@ def batch_conceptnet_generate(opt, nums, losses, batch_variables,
 
 def mle_steps(key, model, input_, targets, attention_mask,
               loss_reduction="mean", i=None):
+
+    #ipdb.set_trace()
+
     word_acts = decode(model, input_.unsqueeze(1),
                        attention_mask, i)
 

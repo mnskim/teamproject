@@ -59,8 +59,8 @@ class Trainer(object):
             lrs[i] = param_group['lr']
         self.lrs[self.opt.train.dynamic.epoch] = lrs
 
-        #to_save = self.decide_to_save()
-        to_save = True
+        to_save = self.decide_to_save()
+        #to_save = True
 
         if to_save:
             data.save_step(

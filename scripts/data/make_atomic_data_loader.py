@@ -26,6 +26,13 @@ categories += ["xNeed"]
 categories += ["xReact"]
 categories += ["xWant"]
 
+
+inverse_categories = []
+for category in categories:
+    inverse_categories += [category + 'Inverse']
+    #ipdb.set_trace()
+categories.extend(inverse_categories)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--pickled_data", type=str)
 parser.add_argument("--n_train", type=int, default=10000)

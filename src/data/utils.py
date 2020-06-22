@@ -42,12 +42,16 @@ class Path(object):
 def single_step(start_node, G):
     # Start from a node and randomly sample a path
     edges = list(G[start_node].items())
+    if len(edges) == 0:
+        return None, None, True
     rand_id = np.random.randint(len(edges))
     edge = edges[rand_id]
+    #except ValueError as err:
+    #    ipdb.set_trace()
     obj = edge[0]
     relation = edge[1]['rel']
 
-    return obj, relation
+    return obj, relation, False
 
 
 ################################################################################
