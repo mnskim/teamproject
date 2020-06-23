@@ -25,6 +25,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_num", type=str, default="0")
 parser.add_argument("--split", type=str, default="dev")
 parser.add_argument("--model_name", type=str, default="models/atomic-generation/iteration-500-50000/transformer/categories_oEffect#oReact#oWant#xAttr#xEffect#xIntent#xNeed#xReact#xWant/model_transformer-nL_12-nH_12-hSize_768-edpt_0.1-adpt_0.1-rdpt_0.1-odpt_0.1-pt_gpt-afn_gelu-init_pt-vSize_40542/exp_generation-seed_123-l2_0.01-vl2_T-lrsched_warmup_linear-lrwarm_0.002-clip_1-loss_nll-b2_0.999-b1_0.9-e_1e-08/bs_1-smax_40-sample_greedy-numseq_1-gs_1000-es_1000-categories_oEffect#oReact#oWant#xAttr#xEffect#xIntent#xNeed#xReact#xWant/6.25e-05_adam_64_22000.pickle")
+parser.add_argument("--pickled_data", type=str, default=None)
+
 
 args = parser.parse_args()
 split = args.split
@@ -69,9 +71,12 @@ for eval_categories in set_of_categories:
         is_dir=True, eval_=True), split, "pickle")
     print("Will save {} losses to {}".format(split, results_name))
 
-    path = "data/atomic/processed/generation/{}.pickle".format(
-        utils.make_name_string(opt.data).replace(
-            "kr_{}".format(opt.data.get("kr", 1)), "kr_1"))
+    if not args.pickled_data == None:
+        path = args.pickled_data
+    else:
+        path = "data/atomic/processed/generation/{}.pickle".format(
+            utils.make_name_string(opt.data).replace(
+                "kr_{}".format(opt.data.get("kr", 1)), "kr_1"))
     data_loader = data.make_data_loader(opt, opt.data.categories)
     loaded = data_loader.load_data(path)
 
