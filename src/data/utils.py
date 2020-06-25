@@ -28,11 +28,16 @@ class Path(object):
         #self.rels =
         self.walk = [start_node]
 
-    def update(self, node, rel):
-        if not node in self.nodes:
-            self.walk.append(rel)
-            self.walk.append(node)
-            self.nodes.add(node)
+    def update(self, node, rel, prepend=False):
+        if not node in self.nodes: # Disallow duplicate nodes
+            if not prepend:
+                self.walk.append(rel)
+                self.walk.append(node)
+                self.nodes.add(node)
+            else:
+                self.walk = [rel] + self.walk
+                self.walk = [node] + self.walk
+                self.nodes.add(node)
 
             return 1
 
@@ -50,6 +55,23 @@ def single_step(start_node, G):
     #    ipdb.set_trace()
     obj = edge[0]
     relation = edge[1]['rel']
+
+    return obj, relation, False
+
+def single_step_reverse(start_node, G):
+    # Start from a node and randomly sample a path in the reverse direction
+    in_edges = list(G.in_edges(start_node))
+    if len(in_edges) == 0:
+        return None, None, True
+    rand_id = np.random.randint(len(in_edges))
+    #ipdb.set_trace()
+    #edge = edges[rand_id]
+    #except ValueError as err:
+    #    ipdb.set_trace()
+    #obj = edge[0]
+    #relation = edge[1]['rel']
+    obj = in_edges[rand_id][0]
+    relation = G[obj][start_node]['rel']
 
     return obj, relation, False
 

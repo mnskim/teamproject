@@ -1,3 +1,4 @@
+import ipdb
 import os
 import time
 import sys
@@ -25,8 +26,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_num", type=str, default="0")
 parser.add_argument("--split", type=str, default="dev")
 parser.add_argument("--model_name", type=str, default="models/atomic-generation/iteration-500-50000/transformer/categories_oEffect#oReact#oWant#xAttr#xEffect#xIntent#xNeed#xReact#xWant/model_transformer-nL_12-nH_12-hSize_768-edpt_0.1-adpt_0.1-rdpt_0.1-odpt_0.1-pt_gpt-afn_gelu-init_pt-vSize_40542/exp_generation-seed_123-l2_0.01-vl2_T-lrsched_warmup_linear-lrwarm_0.002-clip_1-loss_nll-b2_0.999-b1_0.9-e_1e-08/bs_1-smax_40-sample_greedy-numseq_1-gs_1000-es_1000-categories_oEffect#oReact#oWant#xAttr#xEffect#xIntent#xNeed#xReact#xWant/6.25e-05_adam_64_22000.pickle")
-parser.add_argument("--pickled_data", type=str, default=None)
-
+parser.add_argument("--pickled_data", type=str, default=None, help='Pickled data for evaluation')
+parser.add_argument("--model_pickled_data", type=str, default=None, help="Pickled data that model was trained on")
+parser.add_argument("--eval_comet_loss", action='store_true', default=False, help="Use comet format loss")
+parser.add_argument("--results_name", type=str, default=None, help="Override the save name")
 
 args = parser.parse_args()
 split = args.split
@@ -44,20 +47,30 @@ config = cfg.read_config(cfg.load_config(config_file))
 cfg.device = config.gpu_index
 eval_opt = cfg.get_eval_parameters(config)
 
+# Add our custom evaluation args
+eval_opt.eval_comet_loss = args.eval_comet_loss
+eval_opt.results_name = args.results_name
+
 # Batch multiple models
 model_file = data.load_checkpoint(args.model_name)
 opt = model_file["opt"]
 
 opt.eval.update(eval_opt)
 
+#ipdb.set_trace()
+
 print("Loading Data")
+
+# Exclude Inverse categories from eval
+opt.data.categories = [item for item in opt.data.categories if not 'Inverse' in item]
 
 # Do multiple sets of categories:
 # compute individual perplexity of categories in addition to total perplexity
 if len(opt.data.categories) == 1:
     set_of_categories = [opt.data.categories]
 else:
-    set_of_categories = [opt.data.categories] + [[i] for i in opt.data.categories]
+    #set_of_categories = [opt.data.categories] + [[i] for i in opt.data.categories]
+    set_of_categories = [opt.data.categories]
 
 print(set_of_categories)
 
@@ -66,9 +79,12 @@ for eval_categories in set_of_categories:
     print(eval_categories)
     opt.eval.categories = eval_categories
 
-    results_name = "{}/{}.{}".format(utils.make_name(
-        opt, prefix="results/{}/".format("losses"),
-        is_dir=True, eval_=True), split, "pickle")
+    if not args.results_name == None:
+        results_name = args.results_name
+    else:
+        results_name = "{}/{}.{}".format(utils.make_name(
+            opt, prefix="results/{}/".format("losses"),
+            is_dir=True, eval_=True), split, "pickle")
     print("Will save {} losses to {}".format(split, results_name))
 
     if not args.pickled_data == None:
@@ -93,21 +109,42 @@ for eval_categories in set_of_categories:
     special += formatted_categories
     special += [data.blank_token]
 
-    # Load vocab encoder and decoder from pre-initialized data_loader
-    text_encoder.encoder = data_loader.vocab_encoder
-    text_encoder.decoder = data_loader.vocab_decoder
+    #ipdb.set_trace()
+    if not args.model_pickled_data == None:
+        model_data_loader = data.make_data_loader(opt, opt.data.categories)
+        _loaded = model_data_loader.load_data(args.model_pickled_data)
 
-    # Get component segmentation of sequences
-    # context_size_event = maximum size of an event description
-    # context_size_effect = maximum size of an event effect/intent/etc.
-    context_size_event = data_loader.max_event
-    context_size_effect = data_loader.max_effect
+        # Load vocab encoder and decoder from pre-initialized data_loader
+        text_encoder.encoder = model_data_loader.vocab_encoder
+        text_encoder.decoder = model_data_loader.vocab_decoder
 
-    n_special = len(special)
-    n_ctx = context_size_event + context_size_effect
-    n_vocab = len(text_encoder.encoder) + n_ctx
+        # Get component segmentation of sequences
+        # context_size_event = maximum size of an event description
+        # context_size_effect = maximum size of an event effect/intent/etc.
+        context_size_event = model_data_loader.max_event
+        context_size_effect = model_data_loader.max_effect
 
-    opt.net.vSize = n_vocab
+        n_special = len(special)
+        n_ctx = context_size_event + context_size_effect
+        n_vocab = len(text_encoder.encoder) + n_ctx
+
+        opt.net.vSize = n_vocab
+    else:
+        # Load vocab encoder and decoder from pre-initialized data_loader
+        text_encoder.encoder = data_loader.vocab_encoder
+        text_encoder.decoder = data_loader.vocab_decoder
+
+        # Get component segmentation of sequences
+        # context_size_event = maximum size of an event description
+        # context_size_effect = maximum size of an event effect/intent/etc.
+        context_size_event = data_loader.max_event
+        context_size_effect = data_loader.max_effect
+
+        n_special = len(special)
+        n_ctx = context_size_event + context_size_effect
+        n_vocab = len(text_encoder.encoder) + n_ctx
+
+        opt.net.vSize = n_vocab
 
     # Prune data from data loader depending on the evaluation set
     if not all([i in opt.eval.categories for i in opt.data.categories]):

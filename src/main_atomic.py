@@ -14,7 +14,7 @@ from src.data.utils import TextEncoder
 from src.train.opt import OpenAIAdam
 
 
-def main(num, pickled_data=None):
+def main(num, args):
     # Generate configuration files depending on experiment being run
     utils.generate_config_files("atomic", num)
 
@@ -26,6 +26,11 @@ def main(num, pickled_data=None):
     # Read config file to option
     config = cfg.read_config(cfg.load_config(config_file))
     opt, meta = cfg.get_parameters(config)
+    
+    # @Minsoo it's hacky but add our custom args here
+    opt['train']['static'].train_comet_loss = args.train_comet_loss
+    opt['eval'].eval_comet_loss = args.eval_comet_loss
+    opt.save_path = args.save_path
     #ipdb.set_trace()
 
     # Set the random seeds
@@ -44,8 +49,8 @@ def main(num, pickled_data=None):
     categories = opt.data.categories
 
     #ipdb.set_trace()
-    if not pickled_data == None:
-        opt.pickled_data = pickled_data
+    if not args.pickled_data == None:
+        opt.pickled_data = args.pickled_data
         path = opt.pickled_data
     else:
         path = "data/atomic/processed/{}/{}.pickle".format(opt.exp, utils.make_name_string(opt.data))
@@ -87,6 +92,7 @@ def main(num, pickled_data=None):
 
     print("Done.")
 
+    #ipdb.set_trace()
     print("Files will be logged at: {}".format(
         utils.make_name(opt, prefix="results/losses/",
                         is_dir=True, eval_=True)))
@@ -125,6 +131,7 @@ def main(num, pickled_data=None):
     scorers = ["bleu", "rouge", "cider"]
     trainer = train.make_trainer(
         opt, meta, data_loader, model, optimizer)
+    #ipdb.set_trace()
     trainer.set_evaluator(opt, model, data_loader)
 
     trainer.run()

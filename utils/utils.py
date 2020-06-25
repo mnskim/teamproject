@@ -1,3 +1,4 @@
+import ipdb
 import json
 import copy
 
@@ -23,22 +24,34 @@ def make_new_tensor_from_list(items, device_num, dtype=torch.float32):
 # should be a directory or a filename
 def make_name(opt, prefix="", eval_=False, is_dir=True, set_epoch=None,
               do_epoch=True):
+
     string = prefix
-    string += "{}-{}".format(opt.dataset, opt.exp)
-    string += "/"
-    string += "{}-{}-{}".format(opt.trainer, opt.cycle, opt.iters)
-    string += "/"
-    string += opt.model
-    if opt.mle:
-        string += "-{}".format(opt.mle)
-    string += "/"
-    string += make_name_string(opt.data) + "/"
 
-    string += make_name_string(opt.net) + "/"
-    string += make_name_string(opt.train.static) + "/"
+    # @Minsoo  Override the string creation with a unique experiment name if provided
+    if not opt.save_path == None:
+        string += opt.save_path
+        string += '/'
 
-    if eval_:
-        string += make_name_string(opt.eval) + "/"
+        if eval_:
+            string += 'evalution' + '/'
+    else:
+        string += "{}-{}".format(opt.dataset, opt.exp)
+        string += "/"
+        string += "{}-{}-{}".format(opt.trainer, opt.cycle, opt.iters)
+        string += "/"
+        string += opt.model
+        if opt.mle:
+            string += "-{}".format(opt.mle)
+
+        string += "/"
+        #string += make_name_string(opt.data) + "/" #@Minsoo dont put categories in path
+
+        string += make_name_string(opt.net) + "/"
+        string += make_name_string(opt.train.static) + "/"
+
+        if eval_:
+            string += make_name_string(opt.eval) + "/"
+    #ipdb.set_trace()
     # mkpath caches whether a directory has been created
     # In IPython, this can be a problem if the kernel is
     # not reset after a dir is deleted. Trying to recreate

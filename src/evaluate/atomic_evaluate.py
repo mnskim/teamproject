@@ -1,3 +1,5 @@
+import functools
+import ipdb
 import src.train.batch as batch
 import src.evaluate.evaluate as base_evaluate
 import numpy as np
@@ -14,7 +16,15 @@ class AtomicGenerationEvaluator(base_evaluate.Evaluator):
         super(AtomicGenerationEvaluator, self).__init__(
             opt, model, data_loader)
 
-        self.batch = batch.batch_atomic_generate
+        if opt['eval'].eval_comet_loss:
+            _func = functools.partial(batch.batch_atomic_generate, comet_loss=True)
+            self.batch = _func
+        else:
+            self.batch = batch.batch_atomic_generate
+        #if not opt.eval.comet_loss:
+        #    self.batch = batch.batch_atomic_generate
+        #else:
+        #    self.batch = functools.partial(batch.batch_atomic_generate, comet_loss=True)
 
     def initialize_losses(self):
         average_loss = {"total_micro": 0, "total_macro": 0}

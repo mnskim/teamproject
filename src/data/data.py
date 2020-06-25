@@ -29,6 +29,8 @@ def save_step(model, vocab, optimizer, opt, length, lrs):
     else:
         name = "{}.pickle".format(utils.make_name(
             opt, prefix="models/", is_dir=False, eval_=True))
+
+    #ipdb.set_trace()
     save_checkpoint({
         "epoch": length, "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(), "opt": opt,
@@ -37,14 +39,18 @@ def save_step(model, vocab, optimizer, opt, length, lrs):
 
 
 def save_eval_file(opt, stats, eval_type="losses", split="dev", ext="pickle"):
-    if cfg.test_save:
-        name = "{}/{}.{}".format(utils.make_name(
-            opt, prefix="garbage/{}/".format(eval_type),
-            is_dir=True, eval_=True), split, ext)
+    if 'results_name' in opt.eval:
+        if not opt.eval.results_name == None:
+            name = opt.eval.results_name
     else:
-        name = "{}/{}.{}".format(utils.make_name(
-            opt, prefix="results/{}/".format(eval_type),
-            is_dir=True, eval_=True), split, ext)
+        if cfg.test_save:
+            name = "{}/{}.{}".format(utils.make_name(
+                opt, prefix="garbage/{}/".format(eval_type),
+                is_dir=True, eval_=True), split, ext)
+        else:
+            name = "{}/{}.{}".format(utils.make_name(
+                opt, prefix="results/{}/".format(eval_type),
+                is_dir=True, eval_=True), split, ext)
     print("Saving {} {} to {}".format(split, eval_type, name))
 
     if ext == "pickle":

@@ -18,7 +18,7 @@ from IPython import embed
 ##############################################################################
 
 
-def batch_atomic_generate(opt, nums, losses, batch_variables, eval_mode=False):
+def batch_atomic_generate(opt, nums, losses, batch_variables, eval_mode=False, comet_loss=False):
     data_loader = batch_variables["data"]
     model = batch_variables["model"]
     split = batch_variables["split"]
@@ -29,6 +29,12 @@ def batch_atomic_generate(opt, nums, losses, batch_variables, eval_mode=False):
         opt, data_loader.vocab_encoder, batch["sequences"].unsqueeze(-1))
     attention_mask = batch["attention_mask"]
     loss_mask = batch["loss_mask"]
+
+    #ipdb.set_trace()
+    if comet_loss:
+        len_before_lastobj = batch["len_before_lastobj"]
+        for ii in range(loss_mask.size(0)):
+            loss_mask[ii][:len_before_lastobj[ii]-1] = 0
 
     targets = input_.squeeze(0)[:, 1:, 0].contiguous().view(-1)
 

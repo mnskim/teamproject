@@ -42,6 +42,11 @@ class DataLoader(object):
         self.masks["dev"] = {}
         self.masks["test"] = {}
 
+        self.len_before_lastobj = {}
+        self.len_before_lastobj["train"] = {}
+        self.len_before_lastobj["dev"] = {}
+        self.len_before_lastobj["test"] = {}
+    
         self.offsets = {}
         self.offsets["train"] = {}
         self.offsets["dev"] = {}
@@ -91,11 +96,13 @@ class GenerationDataLoader(DataLoader):
             self.n_test = opt.n_test
         if 'max_path_len' in opt:
             self.max_path_len = opt.max_path_len
-
+        if 'comet' in opt:
+            self.comet = opt.comet
+        if 'pathcomet' in opt:
+            self.pathcomet = opt.pathcomet
         pprint.pprint(opt)
 
     def load_data(self, path):
-        #ipdb.set_trace()
         if ".pickle" in path:
             print("Loading data from: {}".format(path))
             data_utils.load_existing_data_loader(self, path)
@@ -110,79 +117,169 @@ class GenerationDataLoader(DataLoader):
             elif split == 'test':
                 n_data = self.n_test
 
-            #G=nx.Graph()
-            G=nx.DiGraph()
-            entities = set()
-
+            # Read & load ATOMIC dataset file
             file_name = "v4_atomic_{}.csv".format(map_name(split))
 
             df = pandas.read_csv("{}/{}".format(path, file_name), index_col=0)
-            df.iloc[:, :9] = df.iloc[:, :9].apply(
-                lambda col: col.apply(json.loads))
-            
-            for cat in [item for item in self.categories if not 'Inverse' in item]:
-                attr = df[cat]
-                triples = utils.zipped_flatten(zip(attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+            df.iloc[:, :9] = df.iloc[:, :9].apply(lambda col: col.apply(json.loads))
+ 
+            if self.comet:
+                """
+                For replicating original COMET settings we don't need a graph.
+                """
+                for cat in [item for item in self.categories if not 'Inverse' in item]:
+                    attr = df[cat]
+                    self.data[split]["total"] += utils.zipped_flatten(zip(
+                        attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+                #ipdb.set_trace()
 
-                # Add to the graph
-                for triple in triples:
-                    m1, rel, m2 = triple
-                    entities.add(m1)
-                    entities.add(m2)
-                    G.add_node(m1)
-                    G.add_node(m2)
-                    G.add_edge(m1, m2, rel=rel) 
-                    G.add_edge(m2, m1, rel=rel.replace('>','Inverse>'))# Inverse relation
+            elif self.pathcomet:
+                """
+                Replicate original COMET, but prepend every s,r with a path from a graph
+                """
+                for cat in [item for item in self.categories if not 'Inverse' in item]:
+                    attr = df[cat]
+                    self.data[split]["total"] += utils.zipped_flatten(zip(
+                        attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
-                    #ipdb.set_trace()
-                #self.data[split]["total"] += utils.zipped_flatten(zip(
-                #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+                   
+                # Build graph
+                #G=nx.Graph()
+                G=nx.DiGraph()
+                entities = set()
 
-            examples = []
-            all_nodes = list(G.nodes())
-            random.shuffle(all_nodes)
-            for node in all_nodes:
-                unique_paths = set() # Use for filtering out duplicate paths starting from the same start_node
+               
+                for cat in [item for item in self.categories if not 'Inverse' in item]:
+                    attr = df[cat]
+                    triples = utils.zipped_flatten(zip(attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
-                for _ in range(self.n_per_node):
-                    curr_node = node
+                    # Add to the graph
+                    for triple in triples:
+                        m1, rel, m2 = triple
+                        entities.add(m1)
+                        entities.add(m2)
+                        G.add_node(m1, type='subj')
+                        G.add_node(m2, type='obj')
+                        G.add_edge(m1, m2, rel=rel) 
+                        G.add_edge(m2, m1, rel=rel.replace('>','Inverse>'))# Inverse relation
+
+                        #ipdb.set_trace()
+                    #self.data[split]["total"] += utils.zipped_flatten(zip(
+                    #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+
+                examples = []
+                for base_subj, base_rel, base_obj in self.data[split]["total"]:
+                    curr_node = base_subj
                     walk = data_utils.Path(curr_node)
+                    walk.nodes.add(base_obj) # We don't want to see the target object in the input path
 
                     n_attempts = 0
                     while len(walk.walk) * 2 < self.max_path_len:
-                        obj, relation, dead_end = data_utils.single_step(curr_node, G)
+                        obj, relation, dead_end = data_utils.single_step_reverse(curr_node, G)
                         if dead_end:
                             n_attempts += 1
                             break
-                        updated = walk.update(obj, relation)
+                        updated = walk.update(obj, relation, prepend=True)
                         if updated:
                             curr_node = obj
                         else:
-                            #ipdb.set_trace()
                             n_attempts += 1
-                        #print(walk.walk)
 
                         if n_attempts > 10 :
                             break
 
-                    if not ' '.join(walk.walk) in unique_paths:
-                        examples.append(walk.walk)
-                        unique_paths.add(' '.join(walk.walk))
-                        #print(' '.join(walk.walk))
+                    assert walk.walk[-1] == base_subj
+                    walk.walk.append(base_rel)
+                    walk.walk.append(base_obj)
+                    examples.append(walk.walk)
 
                     if len(examples) % 500 == 0:
                         print("\nGenerated {} {} examples".format(len(examples), split))
                         print(walk.walk)
 
+
+                    #if len(examples) >= n_data:
+                    #    break
+
+                #examples = examples[:n_data]    
+                self.data[split]["total"] = examples 
+                ipdb.set_trace()
+ 
+
+            else:
+                """
+                Graph based path data generation
+                """
+
+                #G=nx.Graph()
+                G=nx.DiGraph()
+                entities = set()
+
+               
+                for cat in [item for item in self.categories if not 'Inverse' in item]:
+                    attr = df[cat]
+                    triples = utils.zipped_flatten(zip(attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+
+                    # Add to the graph
+                    for triple in triples:
+                        m1, rel, m2 = triple
+                        entities.add(m1)
+                        entities.add(m2)
+                        G.add_node(m1, type='subj')
+                        G.add_node(m2, type='obj')
+                        G.add_edge(m1, m2, rel=rel) 
+                        G.add_edge(m2, m1, rel=rel.replace('>','Inverse>'))# Inverse relation
+
+                        #ipdb.set_trace()
+                    #self.data[split]["total"] += utils.zipped_flatten(zip(
+                    #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+
+
+                examples = []
+                all_nodes = list(G.nodes())
+                random.shuffle(all_nodes)
+                for node in all_nodes:
+                    unique_paths = set() # Use for filtering out duplicate paths starting from the same start_node
+
+                    for _ in range(self.n_per_node):
+                        curr_node = node
+                        walk = data_utils.Path(curr_node)
+
+                        n_attempts = 0
+                        while len(walk.walk) * 2 < self.max_path_len:
+                            obj, relation, dead_end = data_utils.single_step(curr_node, G)
+                            if dead_end:
+                                n_attempts += 1
+                                break
+                            updated = walk.update(obj, relation)
+                            if updated:
+                                curr_node = obj
+                            else:
+                                #ipdb.set_trace()
+                                n_attempts += 1
+                            #print(walk.walk)
+
+                            if n_attempts > 10 :
+                                break
+
+                        if not ' '.join(walk.walk) in unique_paths:
+                            examples.append(walk.walk)
+                            unique_paths.add(' '.join(walk.walk))
+                            #print(' '.join(walk.walk))
+
+                        if len(examples) % 500 == 0:
+                            print("\nGenerated {} {} examples".format(len(examples), split))
+                            print(walk.walk)
+
+                    #ipdb.set_trace()
+
+                    if len(examples) >= n_data:
+                        break
+
+                examples = examples[:n_data]    
+                self.data[split]["total"] = examples 
                 #ipdb.set_trace()
-
-                if len(examples) >= n_data:
-                    break
-
-            examples = examples[:n_data]    
-            self.data[split]["total"] = examples 
-            #ipdb.set_trace()
-            
+                
         if do_take_partial_dataset(self.opt.data):
             self.data["train"]["total"] = select_partial_dataset(
                 self.opt.data, self.data["train"]["total"])
@@ -223,9 +320,10 @@ class GenerationDataLoader(DataLoader):
         self.special_chars = special
 
         sequences = {}
-        for split in splits:
+        for split in splits:                
             sequences[split] = get_generation_sequences(
                 self.opt, self.data, split, text_encoder, test)
+            self.len_before_lastobj[split]["total"] = [0 for _ in range(len(sequences[split]))]
 
             # Merge the path into single sequence
             for idx, path in enumerate(sequences[split]):
@@ -234,12 +332,26 @@ class GenerationDataLoader(DataLoader):
                     s.extend(item)
                 # Add separator here ?? 
                 sequences[split][idx] = s
-                #ipdb.set_trace()
-            
+
+                # Go from right to left until identifying a non-Inverse relation
+                for i, tok in reversed(list(enumerate(s))):
+                    if self.vocab_decoder[tok].lstrip('<').rstrip('>') in [item for item in self.categories if not 'Inverse' in item]:
+                        rel_id = i
+                        #self.len_before_lastobj[split]["total"].append(rel_id + 1)
+                        self.len_before_lastobj[split]["total"][idx] = rel_id + 1
+
+                        # Debugging
+                        #print(rel_id + 1, len([self.vocab_decoder[_] for _ in s[:i+1]]))
+                        #print("Prefix:", [self.vocab_decoder[_] for _ in s[:i+1]])
+                        #print("Final object", [self.vocab_decoder[_] for _ in s[i+1:]])
+                        break
+            #ipdb.set_trace()
+                
             #self.masks[split]["total"] = [(len(i[0]), len(i[1])) for
             #                              i in sequences[split]]
             #self.masks[split]["total"] = [[len(j) for j in i ] for i in sequences[split]]
             self.masks[split]["total"] = [len(i) for i in sequences[split]]
+            #ipdb.set_trace()
 
         self.max_len = max([max([l for l in self.masks[split]["total"]])
                               for split in self.masks])
@@ -281,8 +393,18 @@ class GenerationDataLoader(DataLoader):
             seqs = self.sequences[split]["total"].index_select(
                 0, torch.LongTensor(idxs).to(
                     self.sequences[split]["total"].device))
+            batch["len_before_lastobj"] = [self.len_before_lastobj[split]["total"][idx] for idx in idxs]
+            #ipdb.set_trace()
         else:
             seqs = self.sequences[split]["total"][offset:offset + bs]
+
+            # Add for COMET-format loss mask
+            batch["len_before_lastobj"] = self.len_before_lastobj[split]["total"][offset:offset + bs]
+            #ipdb.set_trace()
+
+        # Add for COMET-format loss mask
+        #batch["len_before_lastobj"] = self.len_before_lastobj[split]["total"][offset:offset + bs]
+        #ipdb.set_trace()
 
         #if split == 'dev':            
             #ipdb.set_trace()
@@ -305,6 +427,7 @@ class GenerationDataLoader(DataLoader):
 
     def reset_offsets(self, splits=["train", "test", "dev"],
                       shuffle=True, keys=None):
+        #ipdb.set_trace()
         if isinstance(splits, str):
             splits = [splits]
 
@@ -319,6 +442,7 @@ class GenerationDataLoader(DataLoader):
                 self.shuffle_sequences(split, keys)
 
     def shuffle_sequences(self, split="train", keys=None):
+        #ipdb.set_trace()
         if keys is None:
             # print(type(self.data))
             # print(type(self.data.keys()))
@@ -337,7 +461,8 @@ class GenerationDataLoader(DataLoader):
             self.data[split][key] = temp
             temp = [self.masks[split][key][i] for i in idxs]
             self.masks[split][key] = temp
-
+            temp = [self.len_before_lastobj[split][key][i] for i in idxs] 
+            self.len_before_lastobj[split][key] = temp
 
 def prune_data_for_evaluation(data_loader, categories, split):
     indices = []

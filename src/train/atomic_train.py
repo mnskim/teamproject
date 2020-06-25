@@ -1,3 +1,5 @@
+import functools
+import ipdb
 import random
 
 import src.train.train as base_train
@@ -31,7 +33,12 @@ class AtomicGenerationIteratorTrainer(base_train.IteratorTrainer):
         self.batch_variables["sampler"] = self.samplers
 
     def batch(self, opt, *args):
-        outputs = batch.batch_atomic_generate(opt, *args)
+        #ipdb.set_trace()
+        if opt['train']['static'].train_comet_loss:
+            _func = functools.partial(batch.batch_atomic_generate, comet_loss=True)
+            outputs = _func(opt, *args)
+        else:
+            outputs = batch.batch_atomic_generate(opt, *args)
 
         token_loss = outputs["loss"]
         nums = outputs["nums"]
