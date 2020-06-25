@@ -174,7 +174,7 @@ class GenerationDataLoader(DataLoader):
                     walk.nodes.add(base_obj) # We don't want to see the target object in the input path
 
                     n_attempts = 0
-                    while len(walk.walk) * 2 < self.max_path_len:
+                    while len(walk.walk) * 1 < self.max_path_len:
                         obj, relation, dead_end = data_utils.single_step_reverse(curr_node, G)
                         if dead_end:
                             n_attempts += 1
@@ -203,7 +203,7 @@ class GenerationDataLoader(DataLoader):
 
                 #examples = examples[:n_data]    
                 self.data[split]["total"] = examples 
-                ipdb.set_trace()
+                #ipdb.set_trace()
  
 
             else:
@@ -246,7 +246,7 @@ class GenerationDataLoader(DataLoader):
                         walk = data_utils.Path(curr_node)
 
                         n_attempts = 0
-                        while len(walk.walk) * 2 < self.max_path_len:
+                        while len(walk.walk) * 1 < self.max_path_len:
                             obj, relation, dead_end = data_utils.single_step(curr_node, G)
                             if dead_end:
                                 n_attempts += 1
