@@ -44,8 +44,8 @@ class Evaluator(object):
         start_time = time.time()
 
         # Initialize progress bar
-        bar = utils.set_progress_bar(
-            data_loader.total_size[split])
+        #bar = utils.set_progress_bar(
+        #    data_loader.total_size[split])
         #ipdb.set_trace()
 
         reset = False
@@ -63,9 +63,9 @@ class Evaluator(object):
 
                 reset = outputs["reset"]
 
-                if not reset:
-                    bar.update(end - start)
-                    #pass
+                #if not reset:
+                    #bar.update(end - start)
+                    pass
                 else:
                     print(end)
 
