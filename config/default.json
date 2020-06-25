@@ -42,7 +42,7 @@
     "trainer": "iteration",
 
     "iterations": 100000,
-    "cycle": 1000,
+    "cycle": 500,
 
     "save_strategy": "best",
 
