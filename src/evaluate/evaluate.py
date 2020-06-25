@@ -63,7 +63,7 @@ class Evaluator(object):
 
                 reset = outputs["reset"]
 
-                #if not reset:
+                if not reset:
                     #bar.update(end - start)
                     pass
                 else:
