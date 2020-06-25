@@ -20,6 +20,7 @@ python scripts/data/make_atomic_data_loader.py --pickled_data "$DATASET_PICKLE" 
 ```
 
 <h3> Original COMET format data </h3>
+
 The original COMET data has the form s, r -> o. We provide the option to generate this format with the ```--comet``` flag. The other args are ignored and the entire ATOMIC dataset will be generated.
 
 ```
@@ -27,6 +28,7 @@ python scripts/data/make_atomic_data_loader.py --pickled_data "$DATASET_PICKLE" 
 ```
 
 <h3> Path COMET format data </h3>
+
 We provide the option to sample a single path and prepend it to the s,r of the original COMET data, yielding the form, path, s, r -> o. Use the ```--pathcomet``` flag. The other args are ignored and the entire ATOMIC dataset will be generated.
 
 ```
