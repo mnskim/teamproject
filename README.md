@@ -35,3 +35,26 @@ We provide the option to sample a single path and prepend it to the s,r of the o
 python scripts/data/make_atomic_data_loader.py --pickled_data "$DATASET_PICKLE" --pathcomet
 ```
 
+<h1>ATOMIC Training</h1>
+
+Like COMET, the training script finetunes a pre-trained GPT2 model. Set a unique experiment ID with ```EXPERIMENT_NAME="myexp0 "``` and run the following commands. 
+
+<h3> Train a language model on knowledge graph random walks </h3>
+
+```
+python src/main.py --experiment_type atomic --experiment_num 0 --pickled_data "$DATASET_PICKLE" --save_path "$EXPERIMENT_NAME"
+```
+
+<h3> Incorporate COMET objective into training or evaluation </h3>
+
+If you created a dataset with the ```--comet``` or ```--pathcomet``` flag, you can apply the COMET objective in the training, evaluation, or both. 
+
+```
+python src/main.py --experiment_type atomic --experiment_num 0 --pickled_data "$DATASET_PICKLE" --save_path "$EXPERIMENT_NAME" --train_comet_loss
+python src/main.py --experiment_type atomic --experiment_num 0 --pickled_data "$DATASET_PICKLE" --save_path "$EXPERIMENT_NAME" --eval_comet_loss
+python src/main.py --experiment_type atomic --experiment_num 0 --pickled_data "$DATASET_PICKLE" --save_path "$EXPERIMENT_NAME" --train_comet_loss --eval_comet_loss
+```
+
+The ```train_comet_loss``` flag applies the COMET objective to training, instead of the default language modeling objective, by masking out the loss on all tokens other than the tokens of final object in the training example. The ```eval_comet_loss``` flag applies the same idea to evaluation. 
+
+So the first line in the above commands will train the model on the COMET objective and select the best model on LM perplexity. The second line will train the model on the LM objective and select the best model based on COMET objective. The third line is equivalent (the implementation details differ) to the original COMET model.
