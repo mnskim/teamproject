@@ -87,7 +87,10 @@ class GenerationDataLoader(DataLoader):
         self.max_effect = None
 
         if 'n_per_node' in opt:
-            self.n_per_node = opt.n_per_node
+            self.n_per_node = {}
+            self.n_per_node['train'] = opt.n_per_node[0]
+            self.n_per_node['dev'] = opt.n_per_node[1]
+            self.n_per_node['test'] = opt.n_per_node[2]
         if 'n_train' in opt:
             self.n_train = opt.n_train
         if 'n_dev' in opt:
@@ -100,6 +103,11 @@ class GenerationDataLoader(DataLoader):
             self.comet = opt.comet
         if 'pathcomet' in opt:
             self.pathcomet = opt.pathcomet
+            if 'add_orig' in opt:
+                self.add_orig = {}
+                self.add_orig['train'] = bool(int(opt.add_orig[0]))
+                self.add_orig['dev'] = bool(int(opt.add_orig[1]))
+                self.add_orig['test'] = bool(int(opt.add_orig[2]))
         pprint.pprint(opt)
 
     def load_data(self, path):
@@ -137,12 +145,20 @@ class GenerationDataLoader(DataLoader):
                 """
                 Replicate original COMET, but prepend every s,r with a path from a graph
                 """
+                comet_orig = {}
+                comet_orig['train'] = {"total": []}
+                comet_orig['dev'] = {"total": []}
+                comet_orig['test'] = {"total": []}
+
                 for cat in [item for item in self.categories if not 'Inverse' in item]:
                     attr = df[cat]
-                    self.data[split]["total"] += utils.zipped_flatten(zip(
+                    #self.data[split]["total"] += utils.zipped_flatten(zip(
+                    #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+                    comet_orig[split]["total"] += utils.zipped_flatten(zip(
                         attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
+                
+                comet_orig[split]["total"] = [list(item) for item in comet_orig[split]["total"]] # Convert tuples into list
 
-                   
                 # Build graph
                 #G=nx.Graph()
                 G=nx.DiGraph()
@@ -161,48 +177,59 @@ class GenerationDataLoader(DataLoader):
                         G.add_node(m1, type='subj')
                         G.add_node(m2, type='obj')
                         G.add_edge(m1, m2, rel=rel) 
-                        G.add_edge(m2, m1, rel=rel.replace('>','Inverse>'))# Inverse relation
+                        G.add_edge(m2, m1, rel=rel.replace('>','Inverse>')) # Inverse relation
 
                         #ipdb.set_trace()
                     #self.data[split]["total"] += utils.zipped_flatten(zip(
                     #    attr.index, ["<{}>".format(cat)] * len(attr), attr.values))
 
                 examples = []
-                for base_subj, base_rel, base_obj in self.data[split]["total"]:
-                    curr_node = base_subj
-                    walk = data_utils.Path(curr_node)
-                    walk.nodes.add(base_obj) # We don't want to see the target object in the input path
+                for base_subj, base_rel, base_obj in comet_orig[split]["total"]:
+                    unique_paths = set()
 
-                    n_attempts = 0
-                    while len(walk.walk) * 1 < self.max_path_len:
-                        obj, relation, dead_end = data_utils.single_step_reverse(curr_node, G)
-                        if dead_end:
-                            n_attempts += 1
-                            break
-                        updated = walk.update(obj, relation, prepend=True)
-                        if updated:
-                            curr_node = obj
-                        else:
-                            n_attempts += 1
+                    for _ in range(self.n_per_node[split]):
+                        curr_node = base_subj
+                        walk = data_utils.Path(curr_node)
+                        walk.nodes.add(base_obj) # We don't want to see the target object in the input path
 
-                        if n_attempts > 10 :
-                            break
+                        n_attempts = 0
+                        while len(walk.walk) * 1 < self.max_path_len:
+                            obj, relation, dead_end = data_utils.single_step_reverse(curr_node, G)
+                            if dead_end:
+                                n_attempts += 1
+                                break
+                            updated = walk.update(obj, relation, prepend=True)
+                            if updated:
+                                curr_node = obj
+                            else:
+                                n_attempts += 1
 
-                    assert walk.walk[-1] == base_subj
-                    walk.walk.append(base_rel)
-                    walk.walk.append(base_obj)
-                    examples.append(walk.walk)
+                            if n_attempts > 10 :
+                                break
 
-                    if len(examples) % 500 == 0:
-                        print("\nGenerated {} {} examples".format(len(examples), split))
-                        print(walk.walk)
+                        if not ' '.join(walk.walk + [base_rel] + [base_obj]) in unique_paths:
+                            assert walk.walk[-1] == base_subj
+                            walk.walk.append(base_rel)
+                            walk.walk.append(base_obj)
+                            examples.append(walk.walk)
+                            unique_paths.add(' '.join(walk.walk))
+
+                        #ipdb.set_trace()
+
+                        if len(examples) % 500 == 0:
+                            print("\nGenerated {} {} examples".format(len(examples), split))
+                            print(walk.walk)
 
 
-                    #if len(examples) >= n_data:
-                    #    break
-
+                        #if len(examples) >= n_data:
+                        #    break
+                    #ipdb.set_trace()
                 #examples = examples[:n_data]    
-                self.data[split]["total"] = examples 
+                if self.add_orig[split]:
+                    self.data[split]["total"] += comet_orig[split]["total"]
+                    self.data[split]["total"] += examples
+                else:
+                    self.data[split]["total"] = examples 
                 #ipdb.set_trace()
  
 
@@ -241,7 +268,7 @@ class GenerationDataLoader(DataLoader):
                 for node in all_nodes:
                     unique_paths = set() # Use for filtering out duplicate paths starting from the same start_node
 
-                    for _ in range(self.n_per_node):
+                    for _ in range(self.n_per_node[split]):
                         curr_node = node
                         walk = data_utils.Path(curr_node)
 
