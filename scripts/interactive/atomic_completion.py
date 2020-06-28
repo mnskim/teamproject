@@ -41,6 +41,7 @@ parser.add_argument("--pickled_data", type=str)
 parser.add_argument("--model_pickled_data", type=str)
 
 parser.add_argument("--comet_completion", action="store_true")
+parser.add_argument("--rel_select", action="store_true")
 
 args = parser.parse_args()
 split = args.split
@@ -240,17 +241,23 @@ with torch.no_grad():
             subject_input = ""
             while len(subject_input) <= 0:
                 subject_input = input("Subject:")
-            rel_input = "notAnInt"
-            pprint.pprint(list(enumerate(data_loader.categories)))
-            while not RepresentsInt(rel_input):
-                rel_input = input("Select a relation:")
-                if RepresentsInt(rel_input):
-                    rel_input = int(rel_input)
 
             tensor = []
             tensor += [text_encoder.encoder["<START>"]]
             tensor += text_encoder.encode([subject_input])[0]
-            tensor += [text_encoder.encoder['<' + data_loader.categories[rel_input] + '>']]
+
+
+            if args.rel_select:
+                rel_input = "notAnInt"
+                pprint.pprint(list(enumerate(data_loader.categories)))
+                while not RepresentsInt(rel_input):
+                    rel_input = input("Select a relation:")
+                    if RepresentsInt(rel_input):
+                        rel_input = int(rel_input)
+
+                tensor += [text_encoder.encoder['<' + data_loader.categories[rel_input] + '>']]
+                print(subject_input, data_loader.categories[rel_input])
+
             XMB = torch.tensor([tensor]).cuda()
             print(XMB)
             #print([data_loader.vocab_decoder[item] for item in XMB[0].tolist()])
@@ -262,7 +269,6 @@ with torch.no_grad():
             #        "<blank>", "___ ") for i in XMB[:, :-1].squeeze().tolist() if i])
             #attr = text_encoder.decoder[XMB[:, -1].item()].strip("<>")
 
-            print(subject_input, data_loader.categories[rel_input])
             #ipdb.set_trace()
 
         XMB = model_utils.prepare_position_embeddings(
@@ -369,7 +375,10 @@ with torch.no_grad():
 
         sequence_all['beams'] = beams
         final_sequences.append(sequence_all)
-        print("Subj: {},\nObj: {}\nGen: {}".format(subject_input, gold_object, beams[0]))
+        if args.comet_completion:
+            print("Subj: {}\nObj: {}\nGen: {}".format(subject_input, gold_object, beams[0]))
+        else:
+            print("Subj: {}\nGen: {}".format(subject_input, beams[0]))
         ipdb.set_trace()
 
 
