@@ -378,8 +378,16 @@ with torch.no_grad():
         if args.comet_completion:
             print("Subj: {}\nObj: {}\nGen: {}".format(subject_input, gold_object, beams[0]))
         else:
-            print("Subj: {}\nGen: {}".format(subject_input, beams[0]))
-        ipdb.set_trace()
+            print("subj: {}".format(subject_input))
+            for bid, beam in enumerate(beams):
+                #ipdb.set_trace()
+                _subj = subject_input.rstrip(' ')
+                if args.rel_select:
+                    _subj += ' ' + '<' + data_loader.categories[rel_input] + '>'
+                _completed = ' '.join([_subj, beam])
+                print("Beam {}: {}".format(str(bid), _completed))
+                #print("Subj: {}\nGen: {}".format(subject_input, _completed))
+                #ipdb.set_trace()
 
 
 utils.mkpath("/".join(eval_file_name.split("/")[:-1]))
